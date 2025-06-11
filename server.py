@@ -14,6 +14,7 @@ usernames = {}    # socket -> nickname
 lock      = threading.Lock()
 
 def broadcast_all(msg: bytes):
+    """Kirim message ke SEMUA client"""
     with lock:
         for c in clients:
             try:
@@ -22,7 +23,7 @@ def broadcast_all(msg: bytes):
                 pass
 
 def handle_client(ssock, addr):
-    # Kirim instruksi awal sebagai Unicode, lalu encode
+    # Header
     welcome = (
         "👋 Selamat datang! Gunakan:\n"
         "  /nick <username>  → set nama (3-16 A-Za-z0-9_)\n"
@@ -35,64 +36,69 @@ def handle_client(ssock, addr):
         clients.append(ssock)
 
     username = None
-    while True:
-        try:
-            data = ssock.recv(1024)
-        except:
-            break
-        if not data:
-            break
+    try:
+        while True:
+            data = None
+            try:
+                data = ssock.recv(1024)
+            except:
+                break
+            if not data:
+                break
 
-        msg = data.decode('utf-8', errors='ignore').strip()
+            msg = data.decode('utf-8', errors='ignore').strip()
 
-        # 1) /nick <username>
-        if msg.startswith('/nick '):
-            new = msg.split(' ', 1)[1].strip()
-            if not NICK_REGEX.match(new):
-                ssock.sendall("❌ Nick harus 3-16 karakter alnum/underscore.\n".encode('utf-8'))
-                continue
-            with lock:
-                if new in usernames.values():
-                    ssock.sendall("❌ Nick sudah dipakai, pilih yang lain.\n".encode('utf-8'))
+            # 1) set nickname
+            if msg.startswith('/nick '):
+                new = msg.split(' ', 1)[1].strip()
+                if not NICK_REGEX.match(new):
+                    ssock.sendall("❌ Nick harus 3-16 karakter alnum/underscore.\n".encode('utf-8'))
                     continue
-            username = new
-            usernames[ssock] = username
-            ssock.sendall(f"✅ Nick terdaftar: {username}\n".encode('utf-8'))
-            continue
+                with lock:
+                    if new in usernames.values():
+                        ssock.sendall("❌ Nick sudah dipakai, pilih yang lain.\n".encode('utf-8'))
+                        continue
+                username = new
+                usernames[ssock] = username
+                ssock.sendall(f"✅ Nick terdaftar: {username}\n".encode('utf-8'))
+                continue
 
-        # 2) /list
-        if msg == '/list':
-            with lock:
-                names = ", ".join(usernames.values()) or "(kosong)"
-            ssock.sendall(f"👥 Online: {names}\n".encode('utf-8'))
-            continue
+            # 2) list user
+            if msg == '/list':
+                with lock:
+                    names = ", ".join(usernames.values()) or "(kosong)"
+                ssock.sendall(f"👥 Online: {names}\n".encode('utf-8'))
+                continue
 
-        # 3) /exit
-        if msg == '/exit':
-            ssock.sendall("👋 Bye!\n".encode('utf-8'))
-            break
+            # 3) exit
+            if msg == '/exit':
+                ssock.sendall("👋 Bye!\n".encode('utf-8'))
+                break
 
-        # 4) pesan biasa tanpa nickname
-        if not username:
-            ssock.sendall("⚠️ Set nick dulu: /nick <username>\n".encode('utf-8'))
-            continue
+            # 4) get message
+            if not username:
+                ssock.sendall("⚠️ Set nick dulu: /nick <username>\n".encode('utf-8'))
+                continue
 
-        broadcast_all(f"{username}: {msg}\n".encode('utf-8'))
+            broadcast_all(f"{username}: {msg}\n".encode('utf-8'))
 
-    # cleanup saat disconnect
-    with lock:
-        if ssock in clients:
-            clients.remove(ssock)
-        left = usernames.pop(ssock, None)
-    ssock.close()
-    if left:
-        broadcast_all(f"❌ {left} keluar.\n".encode('utf-8'))
+    finally:
+        removed = None
+        with lock:
+            if ssock in clients:
+                clients.remove(ssock)
+            removed = usernames.pop(ssock, None)
+        ssock.close()
+        if removed:
+            broadcast_all(f"❌ {removed} telah keluar.\n".encode('utf-8'))
+
 
 def main():
     # Setup TLS context
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     context.load_cert_chain(certfile="server.crt", keyfile="server.key")
-    context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1  # minimal TLS1.2
+    # Batasi TLS minimal 1.2
+    context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
     bindsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     bindsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
