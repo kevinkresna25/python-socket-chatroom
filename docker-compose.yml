@@ -1,0 +1,15 @@
+services:
+  chatroom-server:
+    build: .
+    image: kevinkresna25/chatroom-server:latest
+    container_name: chatroom-server
+    ports:
+      - "31234:31234"
+    networks:
+      - chatroom-server
+    restart: always
+
+networks:
+  chatroom-server:
+    name: chatroom-server
+    driver: bridge

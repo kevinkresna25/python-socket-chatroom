@@ -2,7 +2,7 @@ import socket
 import threading
 
 HOST = '0.0.0.0'
-PORT = 12345
+PORT = 31234
 
 clients = []    # list socket semua client
 usernames = {}  # mapping socket -> nama user
@@ -18,7 +18,7 @@ def broadcast_all(message: bytes):
                 pass
 
 def handle_client(client_socket, client_address):
-    # Kirim instruksi awal
+    # init
     client_socket.sendall(
         "👋 Selamat datang! Gunakan:\n"
         "  /nick <username>  → set nama\n"
@@ -55,12 +55,12 @@ def handle_client(client_socket, client_address):
             client_socket.sendall(f"👥 Pengguna online: {names}\n".encode('utf-8'))
             continue
 
-        # 3) exit sendiri
+        # 3) exit 
         if msg == '/exit':
             client_socket.sendall("👋 Bye!\n".encode('utf-8'))
             break
 
-        # 4) pesan biasa
+        # 4) get message
         if not username:
             client_socket.sendall(
                 "⚠️ Silakan set username dulu dengan /nick <username>\n".encode('utf-8')
