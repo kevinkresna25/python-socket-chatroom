@@ -7,6 +7,8 @@ services:
       - "31234:31234"
     networks:
       - chatroom-server
+    volumes:
+      - ./certs:/app/certs:ro
     restart: always
 
 networks:

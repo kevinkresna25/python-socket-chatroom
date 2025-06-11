@@ -96,7 +96,7 @@ def handle_client(ssock: ssl.SSLSocket, addr):
 def main():
     # Setup TLS
     context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.load_cert_chain(certfile="server.crt", keyfile="server.key")
+    context.load_cert_chain(certfile="certs/server.crt", keyfile="certs/server.key")
     context.options |= ssl.OP_NO_TLSv1 | ssl.OP_NO_TLSv1_1
 
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as bindsock:
